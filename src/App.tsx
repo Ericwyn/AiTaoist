@@ -581,33 +581,33 @@ export default function App() {
       <AnimatePresence>
         {!isAccessGranted && (
           <motion.div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-obsidian/80 px-4"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-white/18 px-4 backdrop-blur-md"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
             <motion.form
               onSubmit={handleAccessSubmit}
-              className="w-full max-w-md rounded-3xl border border-gold/20 bg-[#120f0d] p-6 shadow-2xl"
+              className="w-full max-w-md rounded-3xl border border-white/70 bg-white/92 p-6 text-slate-900 shadow-[0_24px_80px_rgba(15,23,42,0.22)] backdrop-blur-xl"
               initial={{ opacity: 0, y: 12, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 12, scale: 0.98 }}
             >
-              <h2 className="text-xl font-semibold text-gold">请输入访问密钥</h2>
-              <p className="mt-2 text-sm text-ink/70">验证通过后才可继续访问与调用接口</p>
+              <h2 className="text-xl font-semibold text-slate-900">请输入访问密钥</h2>
+              <p className="mt-2 text-sm text-slate-600">验证通过后才可继续访问与调用接口</p>
               <input
                 type="password"
                 value={accessKeyInput}
                 onChange={(event) => setAccessKeyInput(event.target.value)}
-                className="mt-5 w-full rounded-2xl border border-gold/20 bg-obsidian/70 px-4 py-3 text-ink outline-none transition focus:border-gold/50"
+                className="mt-5 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:ring-4 focus:ring-amber-100"
                 placeholder="请输入访问密钥"
                 autoFocus
               />
-              {accessKeyError && <p className="mt-3 text-sm text-red-400">{accessKeyError}</p>}
+              {accessKeyError && <p className="mt-3 text-sm text-rose-500">{accessKeyError}</p>}
               <button
                 type="submit"
                 disabled={isAccessChecking}
-                className="mt-5 w-full rounded-2xl bg-gold px-4 py-3 font-medium text-obsidian transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-5 w-full rounded-2xl bg-slate-900 px-4 py-3 font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isAccessChecking ? '验证中...' : '确认进入'}
               </button>
