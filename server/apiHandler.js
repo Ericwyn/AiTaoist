@@ -9,6 +9,15 @@ function getApiKey() {
   return process.env.OPENAI_API_KEY || '';
 }
 
+function getAccessKey() {
+  return process.env.KEY || '';
+}
+
+function getClientAccessKey(req) {
+  const value = req.headers?.['x-access-key'];
+  return Array.isArray(value) ? value[0] || '' : value || '';
+}
+
 function getRequestBody(req) {
   if (!req.body) {
     return {};
@@ -43,9 +52,27 @@ function sendJsonError(res, statusCode, message, allowMethod) {
   });
 }
 
+function ensureAccessKey(req, res) {
+  const accessKey = getAccessKey();
+  if (!accessKey) {
+    return true;
+  }
+
+  if (getClientAccessKey(req) === accessKey) {
+    return true;
+  }
+
+  sendJsonError(res, 401, '访问密钥不正确。');
+  return false;
+}
+
 async function handleModels(req, res) {
   if (req.method !== 'GET') {
     sendJsonError(res, 405, 'Method Not Allowed', 'GET');
+    return;
+  }
+
+  if (!ensureAccessKey(req, res)) {
     return;
   }
 
@@ -75,6 +102,10 @@ async function handleModels(req, res) {
 async function handleFortune(req, res) {
   if (req.method !== 'POST') {
     sendJsonError(res, 405, 'Method Not Allowed', 'POST');
+    return;
+  }
+
+  if (!ensureAccessKey(req, res)) {
     return;
   }
 

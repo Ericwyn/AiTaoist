@@ -23,7 +23,9 @@ import {
   LiuYaoResult as ILiuYaoResult,
   CompatibilityResult as ICompatibilityResult,
   setModel,
-  getModel
+  getModel,
+  setAccessKey,
+  getStoredAccessKey
 } from './services/fortuneService';
 import { motion, AnimatePresence } from 'motion/react';
 import { HelpCircle, Cpu } from 'lucide-react';
@@ -112,6 +114,10 @@ export default function App() {
   // Model State
   const [selectedModel, setSelectedModel] = useState(() => getModel() || PREFERRED_DEFAULT_MODEL);
   const [modelOptions, setModelOptions] = useState<ModelOption[]>(FALLBACK_MODEL_OPTIONS);
+  const [accessKeyInput, setAccessKeyInput] = useState(() => getStoredAccessKey());
+  const [isAccessGranted, setIsAccessGranted] = useState(() => Boolean(getStoredAccessKey()));
+  const [accessKeyError, setAccessKeyError] = useState<string | null>(null);
+  const [isAccessChecking, setIsAccessChecking] = useState(false);
 
   // Bazi State
   const [baziLoading, setBaziLoading] = useState(false);
@@ -144,11 +150,19 @@ export default function App() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   useEffect(() => {
+    if (!isAccessGranted) {
+      return;
+    }
+
     let cancelled = false;
 
     const loadModels = async () => {
       try {
-        const response = await fetch('/api/models');
+        const response = await fetch('/api/models', {
+          headers: {
+            'x-access-key': getStoredAccessKey(),
+          },
+        });
         const rawPayload = await response.text();
         const payload = parseJsonSafely<{ data?: Array<{ id?: string }>; error?: { message?: string } }>(rawPayload);
 
@@ -195,7 +209,42 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isAccessGranted]);
+
+  const handleAccessSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const normalized = accessKeyInput.trim();
+
+    if (!normalized) {
+      setAccessKeyError('请输入访问密钥');
+      return;
+    }
+
+    setIsAccessChecking(true);
+    setAccessKeyError(null);
+    setAccessKey(normalized);
+
+    try {
+      const response = await fetch('/api/models', {
+        headers: {
+          'x-access-key': normalized,
+        },
+      });
+      const rawPayload = await response.text();
+
+      if (!response.ok) {
+        throw new Error(extractKeyErrorMessage(rawPayload, '访问密钥校验失败', response.status));
+      }
+
+      setIsAccessGranted(true);
+    } catch (error) {
+      setAccessKey('');
+      setIsAccessGranted(false);
+      setAccessKeyError(error instanceof Error ? error.message : '访问密钥校验失败');
+    } finally {
+      setIsAccessChecking(false);
+    }
+  };
 
   useEffect(() => {
     return () => {
@@ -528,6 +577,44 @@ export default function App() {
       </div>
 
       <HelpFAQ isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+
+      <AnimatePresence>
+        {!isAccessGranted && (
+          <motion.div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-obsidian/80 px-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.form
+              onSubmit={handleAccessSubmit}
+              className="w-full max-w-md rounded-3xl border border-gold/20 bg-[#120f0d] p-6 shadow-2xl"
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+            >
+              <h2 className="text-xl font-semibold text-gold">请输入访问密钥</h2>
+              <p className="mt-2 text-sm text-ink/70">验证通过后才可继续访问与调用接口</p>
+              <input
+                type="password"
+                value={accessKeyInput}
+                onChange={(event) => setAccessKeyInput(event.target.value)}
+                className="mt-5 w-full rounded-2xl border border-gold/20 bg-obsidian/70 px-4 py-3 text-ink outline-none transition focus:border-gold/50"
+                placeholder="请输入访问密钥"
+                autoFocus
+              />
+              {accessKeyError && <p className="mt-3 text-sm text-red-400">{accessKeyError}</p>}
+              <button
+                type="submit"
+                disabled={isAccessChecking}
+                className="mt-5 w-full rounded-2xl bg-gold px-4 py-3 font-medium text-obsidian transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isAccessChecking ? '验证中...' : '确认进入'}
+              </button>
+            </motion.form>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
