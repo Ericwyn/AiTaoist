@@ -115,7 +115,8 @@ export default function App() {
   const [selectedModel, setSelectedModel] = useState(() => getModel() || PREFERRED_DEFAULT_MODEL);
   const [modelOptions, setModelOptions] = useState<ModelOption[]>(FALLBACK_MODEL_OPTIONS);
   const [accessKeyInput, setAccessKeyInput] = useState(() => getStoredAccessKey());
-  const [isAccessGranted, setIsAccessGranted] = useState(() => Boolean(getStoredAccessKey()));
+  const [isAccessGranted, setIsAccessGranted] = useState(false);
+  const [isAccessReady, setIsAccessReady] = useState(false);
   const [accessKeyError, setAccessKeyError] = useState<string | null>(null);
   const [isAccessChecking, setIsAccessChecking] = useState(false);
 
@@ -150,23 +151,31 @@ export default function App() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   useEffect(() => {
-    if (!isAccessGranted) {
-      return;
-    }
-
     let cancelled = false;
 
     const loadModels = async () => {
       try {
+        const storedAccessKey = getStoredAccessKey();
         const response = await fetch('/api/models', {
-          headers: {
-            'x-access-key': getStoredAccessKey(),
-          },
+          headers: storedAccessKey
+            ? {
+                'x-access-key': storedAccessKey,
+              }
+            : {},
         });
         const rawPayload = await response.text();
         const payload = parseJsonSafely<{ data?: Array<{ id?: string }>; error?: { message?: string } }>(rawPayload);
 
         if (!response.ok) {
+          if (response.status === 401) {
+            setAccessKey('');
+            if (!cancelled) {
+              setIsAccessGranted(false);
+              setAccessKeyError(extractKeyErrorMessage(rawPayload, '访问密钥校验失败', response.status));
+            }
+            return;
+          }
+
           throw new Error(extractKeyErrorMessage(rawPayload, '模型列表加载失败，请稍后再试。', response.status));
         }
 
@@ -188,6 +197,8 @@ export default function App() {
           setModelOptions(nextOptions);
           setSelectedModel(nextSelectedModel);
           setModel(nextSelectedModel);
+          setIsAccessGranted(true);
+          setAccessKeyError(null);
         }
       } catch (error) {
         console.error('Failed to load model list:', error);
@@ -200,6 +211,12 @@ export default function App() {
           const nextSelectedModel = pickPreferredModel(fallbackOptions);
           setSelectedModel(nextSelectedModel);
           setModel(nextSelectedModel);
+          setIsAccessGranted(true);
+          setAccessKeyError(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsAccessReady(true);
         }
       }
     };
@@ -209,7 +226,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [isAccessGranted]);
+  }, []);
 
   const handleAccessSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -579,7 +596,7 @@ export default function App() {
       <HelpFAQ isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
 
       <AnimatePresence>
-        {!isAccessGranted && (
+        {isAccessReady && !isAccessGranted && (
           <motion.div
             className="fixed inset-0 z-[100] flex items-center justify-center bg-white/18 px-4 backdrop-blur-md"
             initial={{ opacity: 0 }}
